@@ -43,6 +43,9 @@ for (i in 1:dim(int.genes.cg)[1]){
     }
     #Out of 510 case and control genes, 103 genes are missing in this GFF file (7/25/2016)
     #The missing ones are all from different chromosomes (some from 3R, others from X, etc.)
+    #For 103 missing genes, saved in missing.genes, I used DsimVSDmel.orthos to find the unconventional name for
+    #the CG name (ex. 6.g309.t1 is CG4944) and updated the "list.of.case.and.cont.genes.in.Dmel.FBgn.and.CG" to have different names for missing genes.
+    
     
     else { #If the gene is in the GFF file,
         if (dsim.cds.gff.gene.specific$V7 == '+'){ #plus strand
@@ -103,7 +106,7 @@ for (i in 1:dim(int.genes.cg)[1]){
             specific.gene <- matrix(rep(t(coordinates.df.mx),21), ncol=2, byrow=T)
             list.multi <- rep(as.matrix(list), each=dim(coordinates.df.mx)[1]) #or the number of CDS regions
             specific.gene.list <-cbind(list.multi,specific.gene,list.multi)
-            write.table(specific.gene.list, file = paste("bed_files/",int.genes.cg[i,1],"_",int.genes.cg[i,2],"_",int.genes.cg[i,3],".bed", sep=""), quote=F, col.names= F, row.names=F, sep = "\t")
+            #write.table(specific.gene.list, file = paste("bed_files/",int.genes.cg[i,1],"_",int.genes.cg[i,2],"_",int.genes.cg[i,3],".bed", sep=""), quote=F, col.names= F, row.names=F, sep = "\t")
         }
         
         else { #minus strand
@@ -180,10 +183,11 @@ for (i in 1:dim(int.genes.cg)[1]){
             specific.gene.list <-cbind(list.multi,specific.gene,list.multi)
             #print(specific.gene.list)
             
-            write.table(specific.gene.list, file = paste("bed_files/",int.genes.cg[i,1], "_", int.genes.cg[i,2], "_", int.genes.cg[i,3],".bed", sep=""), quote=F, col.names= F, row.names=F, sep = "\t")
+            #write.table(specific.gene.list, file = paste("bed_files/",int.genes.cg[i,1], "_", int.genes.cg[i,2], "_", int.genes.cg[i,3],".bed", sep=""), quote=F, col.names= F, row.names=F, sep = "\t")
         }
     }
     
 }
-write.table(wgs.coordinates, file="wgs.coordinates.from.Dsim.txt", quote=F, row.names = F)
+#write.table(wgs.coordinates, file="wgs.coordinates.from.Dsim.txt", quote=F, row.names = F)
+
 
