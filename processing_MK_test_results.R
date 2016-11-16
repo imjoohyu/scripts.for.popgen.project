@@ -91,8 +91,15 @@ control_only= input_data[which(input_data$target_control_status == "control"),]
 control_only = control_only[order(control_only$gene_function),]
 control_only_int= control_only[which(control_only$gene_function == "Autophagy" | control_only$gene_function == "Phagocytosis" | control_only$gene_function == "Both"),]
 
-#Only pick the significant cases:
-significant_cases = target_only_int[which(target_only_int$DoS >0 & target_only_int$FETpval < five_percent_sig_pval),]
+#Only pick the significant cases in the target of internalization genes:
+target_significant_cases = target_only_int[which(target_only_int$DoS >0 & target_only_int$FETpval < five_percent_sig_pval),]
+#Pick the significant cases in the control of all genes (including recognition and signaling): 
+control_significant_cases = control_only[which(control_only$DoS >0 & control_only$FETpval < five_percent_sig_pval),]
+#Pick the significant cases in the control of all genes (including recognition and signaling): 
+control_significant_cases_int_only = control_only_int[which(control_only_int$DoS >0 & control_only_int$FETpval < five_percent_sig_pval),]
+#Dmel: 0 out of 48 (0%) for target and 11 out of 286 (3.8%) for all controls and 5 out of 206 (2.4%) for int controls
+#Dsim: 6 out of 48 (12.5%) for target and 37 out of 286 (12.9%) for all controls and 28 out of 205 (13.7%) for int controls.
+
 
 
 #2. Plot
@@ -159,17 +166,45 @@ input_data_matched = input_data[order(input_data$target_control_status, decreasi
 input_data_matched[1:66,13] = input_data_matched[1:66,1] #gets a warning but it works (11/15/2016)
 
 attach(input_data); library(lme4); library(lmerTest); library(lsmeans)
+#11/15/16: Results written here are for both Dmel and Dsim
+
+#Model for functional groups:
 model = lmer(DoS ~ target_control_status + gene_function + target_control_status:gene_function + (1|matching_target), data=input_data_matched)
 summary(model)
 anova(model)
 
-model2 = lmer(DoS ~ target_control_status + sub_function + target_control_status:sub_function + (1|matching_target), data=input_data_matched)
+#to check for the assumptions of the model:
+hist(resid(model)) #expected: centered around 0, normal distribution. looks fine
+plot(predict(model),resid(model)) #expected: random scatter around 0, looks okay
+
+lsmeans(model, ~ target_control_status) #model means for each subtype
+ls2 = lsmeans(model, pairwise~gene_function); cld(ls2) #overall comparison of subtypes regardless of target/control status
+#11/15/16: regardless of target/control status, no gene_function is different from each other.
+ls2 = lsmeans(model, pairwise~target_control_status|gene_function); cld(ls2) #pairwise comparison of target vs control within gene function
+#11/15/16: No sig diff between tartget and control.
+ls3 = lsmeans(model, pairwise~gene_function|target_control_status); cld(ls3) #comparing subtypes within targets and within controls
+#11/15/16: Within targets, there's no significant difference. Likewise, there's no significant difference within controls.
+
+#Model for sub-functional groups:
+input_data_matched_int_only = input_data_matched[which(input_data_matched$gene_function == "Autophagy" | input_data_matched$gene_function == "Phagocytosis" | input_data_matched$gene_function == "Both"),]
+
+model2 = lmer(DoS ~ target_control_status + sub_function + target_control_status:sub_function + (1|matching_target), data=input_data_matched_int_only)
 summary(model2)
 anova(model2)
 
-model3 = lmer(DoS ~ target_control_status + sub_function + (1|matching_target), data=input_data_matched)
-summary(model3)
-anova(model3)
+#to check for the assumptions of the model:
+hist(resid(model2)) #expected: centered around 0, normal distribution. looks fine
+plot(predict(model2),resid(model2)) #expected: random scatter around 0, looks okay
+
+lsmeans(model2, ~ target_control_status) #model means for each subtype
+ls2 = lsmeans(model2, pairwise~sub_function); cld(ls2) #overall comparison of subtypes regardless of target/control status
+#11/15/16: regardless of target/control status, no gene_function is different from each other.
+ls2 = lsmeans(model2, pairwise~target_control_status|sub_function); cld(ls2) #pairwise comparison of target vs control within gene function
+#11/15/16: No sig diff between tartget and control.
+ls3 = lsmeans(model2, pairwise~sub_function|target_control_status); cld(ls3) #comparing subtypes within targets and within controls
+#11/15/16: Within targets, there's no significant difference. Likewise, there's no significant difference within controls.
+
+
 
 
 #
