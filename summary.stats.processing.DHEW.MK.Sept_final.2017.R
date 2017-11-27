@@ -530,4 +530,3 @@ colnames(result.target.simplified)[21:26] = c("TajD_rank", "TajD_rank_against_nu
 
 write.table(result.target.simplified, file = paste("/Users/JooHyun/Dropbox/Cornell/Lab/Projects/PopGen/final_data/",indicator, "_DHEW_extracted_compiled_Nov_2017_cleaned_with_function_and_ranking.txt", sep=""), quote=F, row.names = F, col.names = T)
 
-
