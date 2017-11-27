@@ -295,13 +295,27 @@ one_sample_t_test("Recognition", "DoS")
 
 
 ########################################################################################################
-#C. Create comprehensive data file
+#C. Create comprehensive data file for recent selection
 ########################################################################################################
 
+rm(list=ls(all=TRUE))
+setwd("/Users/JooHyun/Dropbox/Cornell/Lab/Projects/PopGen/")
+
+#Indicate which species we're working with:
+#indicator = "Dmel"
+indicator = "Dsim"
+
+result.total = read.table(paste("final_data/", indicator, "_DHEW_extracted_compiled_Nov_2017_cleaned_with_function.txt", sep=""), header=T, sep='\t')
+colnames(result.total)[14] = c("target_control_status") #unify the colname
 
 
-#Method: Based on the p-values (only look at the internalization genes)
+#1) Calculate the adjusted p-values 
+
+#only look at the internalization genes)
+result.target = result.total[which(result.total$target_control_status == "target"),]
 result.target.simplified = result.target[which(result.target$type %in% c("Autophagy", "Phagocytosis", "Both")),c(1,2,4,5,6,7,8,9,10,11,12,13,15,16)]
+
+#Calculate the adjusted p-values
 result.target.simplified[,15] = p.adjust(result.target.simplified$TajD_pval, method = "BH")
 result.target.simplified[,16] = p.adjust(result.target.simplified$nFWH_pval, method = "BH")
 result.target.simplified[,17] = p.adjust(result.target.simplified$EW_pval, method = "BH")
@@ -309,20 +323,16 @@ result.target.simplified[,18] = p.adjust(result.target.simplified$DH_pval, metho
 result.target.simplified[,19] = p.adjust(result.target.simplified$HEW_pval, method = "BH")
 result.target.simplified[,20] = p.adjust(result.target.simplified$DHEW_pval, method = "BH")
 colnames(result.target.simplified)[15:20] = c("TajD_pval_adj", "nFWH_pval_adj", "EW_pval_adj", "DH_pval_adj", "HEW_pval_adj", "DHEW_pval_adj")
-write.table(result.target.simplified, file = "Dsim_DHEW_extracted_compiled_Nov_2017_cleaned_with_function_adj_pval.txt", quote=F, row.names = F, col.names = T)
+
+#Save the p-values
+write.table(result.target.simplified, file = paste("final_data/", indicator, "_DHEW_extracted_compiled_Nov_2017_cleaned_with_function_adj_pval.txt", sep=""), quote=F, row.names = F, col.names = T)
 
 
-#Method: Calculate the difference between median of control genes and target gene and rank them.
-#list.of.target.genes = levels(result.total$matching.target) #list of case genes that have control genes (we got the names from matching case column)
 
-#X out of 74
+#2) Calculate the difference between median of control genes and target gene and rank them (X out of 74).
 
-setwd("/Users/JooHyun/Dropbox/Cornell/Lab/Projects/PopGen/final_data/")
-#result.total=read.table("Dmel_DHEW_extracted_compiled_Nov_2017_cleaned_with_function.txt", header=T)
-result.total=read.table("Dsim_DHEW_extracted_compiled_Nov_2017_cleaned_with_function.txt", header=T)
-
-
-result.target = result.total[which(result.total$target.control.status == "target"),]
+result.target = result.total[which(result.total$target_control_status == "target"),]
+result.cont = result.total[which(result.total$target_control_status == "control"),]
 result.target.internalized = result.target[which(result.target$type %in% c("Autophagy", "Phagocytosis", "Both")),] #only get internalization genes
 list.of.target.genes = droplevels(result.target.internalized$gene_id)
 
@@ -372,7 +382,8 @@ rank_the_difference = function(list.of.target.genes, statistic){
     
     colnames(diff.table) = c("target_id", "target_name", "target_value", "med_cont_value", "diff_median", "type", "subtype", "target_pval")
     diff.table.sorted = diff.table[order(diff.table$diff_median, decreasing=F),]
-    diff.table.sorted = cbind(diff.table.sorted, c(1:length(list.of.target.genes)), c(1:length(list.of.target.genes))/length(list.of.target.genes))
+    percentage_ranking = c(1:length(list.of.target.genes))/length(list.of.target.genes)*100
+    diff.table.sorted = cbind(diff.table.sorted, c(1:length(list.of.target.genes)), percentage_ranking)
     colnames(diff.table.sorted)[9] = "ranking"; colnames(diff.table.sorted)[10] = "percentage_ranking"
     
     return(diff.table.sorted)
@@ -383,22 +394,18 @@ ranking_of_median_difference_EW = rank_the_difference(list.of.target.genes, "EW"
 
 
 
-#Method: Create a distribution of [gene 1 - median(rest of genes)] and see where my [target - median(control)] lands — breaks the pairing/grouping of focal vs control, but you can actually create a distribution. Added on 11/8/2017
-
-#X out of 375
-
-#Create a null distribution
+#3) Create a distribution of [gene 1 - median(rest of genes)] and see where my [target - median(control)] lands — breaks the pairing/grouping of focal vs control, but you can actually create a distribution (X out of 375)
 
 result.target.internalized = result.target[which(result.target$type %in% c("Autophagy", "Phagocytosis", "Both")),] #only get internalization genes
 list.of.target.genes = droplevels(result.target.internalized$gene_id)
+result.total.internalized = result.total[which(result.total$type %in% c("Autophagy", "Phagocytosis", "Both")),] #only get internalization genes with their controls
 
 
-####################Change the code to only get the autophagy genes, etc
-`
+#Create a null distribution
 create_a_null_distribution = function(list.of.target.genes, statistic){
-    data.for.dist = result.total
-    data.for.dist.target.only = data.for.dist[which(data.for.dist$target.control.status == "target"),]
-    data.for.dist.cont.only = data.for.dist[which(data.for.dist$target.control.status == "control"),]
+    data.for.dist = result.total.internalized #internalization genes only + their controls
+    data.for.dist.target.only = data.for.dist[which(data.for.dist$target_control_status == "target"),]
+    data.for.dist.cont.only = data.for.dist[which(data.for.dist$target_control_status == "control"),]
     data.for.dist.target.only$matching.target = data.for.dist.target.only$gene_id
     data.for.dist = rbind(data.for.dist.target.only, data.for.dist.cont.only)
     
@@ -432,15 +439,15 @@ create_a_null_distribution = function(list.of.target.genes, statistic){
     return(median.table.ordered)
 }
 par(mfrow=c(3,1))
-null_distribution_TajD = create_a_null_distribution(list.of.target.genes, "TajD") #Normally distributed (pval is significant), 375
-null_distribution_nFWH = create_a_null_distribution(list.of.target.genes, "nFWH") #Normally distributed (pval is significant), 375
-null_distribution_EW = create_a_null_distribution(list.of.target.genes, "EW") #Normally distributed (pval is significant), 375
+null_distribution_TajD = create_a_null_distribution(list.of.target.genes, "TajD") #240
+null_distribution_nFWH = create_a_null_distribution(list.of.target.genes, "nFWH") #240
+null_distribution_EW = create_a_null_distribution(list.of.target.genes, "EW") #240
 
 #Compare the true [target - median(control)] to the null distribution
 compare_to_null = function(list.of.target.genes, statistic, null.dist){
-    data.for.dist = result.total
-    data.for.dist.target.only = data.for.dist[which(data.for.dist$target.control.status == "target"),]
-    data.for.dist.cont.only = data.for.dist[which(data.for.dist$target.control.status == "control"),]
+    data.for.dist = result.total.internalized
+    data.for.dist.target.only = data.for.dist[which(data.for.dist$target_control_status == "target"),]
+    data.for.dist.cont.only = data.for.dist[which(data.for.dist$target_control_status == "control"),]
     data.for.dist.target.only$matching.target = data.for.dist.target.only$gene_id
     data.for.dist = rbind(data.for.dist.target.only, data.for.dist.cont.only)
     
@@ -467,7 +474,7 @@ compare_to_null = function(list.of.target.genes, statistic, null.dist){
         #find out where the true difference stands in the null distribution
         null.dist.with.true = c(null.dist, diff.median)
         ranking = rank(null.dist.with.true)[length(null.dist)+1] #ranking of the true difference - the last one
-        ranking_percentage = ranking/length(null.dist)
+        ranking_percentage = c(ranking/length(null.dist))*100
         gene_name = as.character(data.for.dist[which(data.for.dist$gene_id == list.of.target.genes[n]),2])
         type = as.character(data.for.dist[which(data.for.dist$gene_id == list.of.target.genes[n]),15])
         subtype = as.character(data.for.dist[which(data.for.dist$gene_id == list.of.target.genes[n]),16])
@@ -475,7 +482,7 @@ compare_to_null = function(list.of.target.genes, statistic, null.dist){
         
         median.table = rbind(median.table, diff.median.and.rank)
     }
-    colnames(median.table) = c("gene_id", "gene_name", "type", "subtype", "True_median_difference", "Ranking", "percentage_of_ranking")
+    colnames(median.table) = c("gene_id", "gene_name", "type", "subtype", "True_median_difference", "Ranking", "percentage_ranking")
     median.table = median.table[order(as.numeric(median.table[,7])),]
     median.table = data.frame(median.table)
     
@@ -484,3 +491,30 @@ compare_to_null = function(list.of.target.genes, statistic, null.dist){
 compare_to_null_TajD = compare_to_null(list.of.target.genes, "TajD", null_distribution_TajD)
 compare_to_null_nFWH = compare_to_null(ist.of.target.genes, "nFWH", null_distribution_nFWH)
 compare_to_null_EW = compare_to_null(list.of.target.genes, "EW", null_distribution_EW)
+
+
+#4) Complie all the results
+
+ranking_of_median_difference_TajD_simplified = ranking_of_median_difference_TajD[,c(1,10)]
+ranking_of_median_difference_nFWH_simplified = ranking_of_median_difference_nFWH[,c(1,10)]
+ranking_of_median_difference_EW_simplified = ranking_of_median_difference_EW[,c(1,10)]
+
+compare_to_null_TajD_simplified = compare_to_null_TajD[,c(1,7)]; compare_to_null_TajD_simplified$percentage_ranking = as.numeric(as.character(compare_to_null_TajD_simplified$percentage_ranking))
+compare_to_null_nFWH_simplified = compare_to_null_nFWH[,c(1,7)]; compare_to_null_nFWH_simplified$percentage_ranking = as.numeric(as.character(compare_to_null_nFWH_simplified$percentage_ranking))
+compare_to_null_EW_simplified = compare_to_null_EW[,c(1,7)]; compare_to_null_EW_simplified$percentage_ranking = as.numeric(as.character(compare_to_null_EW_simplified$percentage_ranking))
+
+for (i in 1:dim(result.target.simplified)[1]){
+    gene_id = as.character(result.target.simplified[i,1])
+    result.target.simplified[i,21] = as.numeric(ranking_of_median_difference_TajD_simplified[which(ranking_of_median_difference_TajD_simplified$target_id == gene_id),2])
+    result.target.simplified[i,22] = as.numeric(compare_to_null_TajD_simplified[which(compare_to_null_TajD_simplified$gene_id == gene_id),2])
+    result.target.simplified[i,23] = as.numeric(ranking_of_median_difference_nFWH_simplified[which(ranking_of_median_difference_nFWH_simplified$target_id == gene_id),2])
+    result.target.simplified[i,24] = as.numeric(compare_to_null_nFWH_simplified[which(compare_to_null_nFWH_simplified$gene_id == gene_id),2])
+    result.target.simplified[i,25] = as.numeric(ranking_of_median_difference_EW_simplified[which(ranking_of_median_difference_EW_simplified$target_id == gene_id),2])
+    result.target.simplified[i,26] = as.numeric(compare_to_null_EW_simplified[which(compare_to_null_EW_simplified$gene_id == gene_id),2])
+}
+colnames(result.target.simplified)[21:26] = c("TajD_rank", "TajD_rank_against_null", "nFWH_rank", "nFWH_rank_against_null", "EW_rank", "EW_rank_against_null")
+
+write.table(result.target.simplified, file = paste("/Users/JooHyun/Dropbox/Cornell/Lab/Projects/PopGen/final_data/",indicator, "_DHEW_extracted_compiled_Nov_2017_cleaned_with_function_and_ranking.txt", sep=""), quote=F, row.names = F, col.names = T)
+
+
+
