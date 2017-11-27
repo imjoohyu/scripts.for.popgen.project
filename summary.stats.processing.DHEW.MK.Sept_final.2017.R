@@ -91,8 +91,8 @@ rm(list=ls(all=TRUE))
 setwd("/Users/JooHyun/Dropbox/Cornell/Lab/Projects/PopGen/final_data/")
 
 ###I. Basic processing
-#indicator = "Dmel"
-indicator = "Dsim"
+indicator = "Dmel"
+#indicator = "Dsim"
 
 basic_processing = function(indicator){
     
@@ -113,9 +113,9 @@ basic_processing = function(indicator){
     #3. Add the gene and function names
     read_func_data <- function(indicator){
         if (indicator == "Dmel"){
-            return(read.table("internalization_list_Dmel_Nov_2017_final.txt", header=T, sep ='\t', stringsAsFactors = F))
+            return(read.table("/Users/JooHyun/Dropbox/Cornell/Lab/Projects/PopGen/final_data/internalization_list_Dmel_Nov_2017_final.txt", header=T, sep ='\t', stringsAsFactors = F))
         } else if (indicator == "Dsim"){
-            return(read.table("internalization_list_Dsim_Nov_2017_final.txt", header=T, sep='\t', stringsAsFactors = F))
+            return(read.table("/Users/JooHyun/Dropbox/Cornell/Lab/Projects/PopGen/final_data/internalization_list_Dsim_Nov_2017_final.txt", header=T, sep='\t', stringsAsFactors = F))
         }
     }
     gene_list = read_func_data(indicator)
@@ -176,17 +176,21 @@ result.cont = result.total[which(result.total$target_control_status == "control"
 cat("The number of target genes for ", indicator, " is: ", dim(result.target)[1], "\n")
 cat("The number of control genes for ", indicator, " is: ", dim(result.cont)[1], "\n")
 
+
 #Save the results
-#write.table(result.total, file="Dmels_Nov_2017_MK_results_analyzed_final.txt", quote=F, col.names = T, row.names = F, sep="\t")
-write.table(result.total, file="Dsims_Nov_2017_MK_results_analyzed_final.txt", quote=F, col.names = T, row.names = F, sep="\t")
+write.table(result.total, file="Dmels_Nov_2017_MK_results_analyzed_final.txt", quote=F, col.names = T, row.names = F, sep="\t")
+#write.table(result.total, file="Dsims_Nov_2017_MK_results_analyzed_final.txt", quote=F, col.names = T, row.names = F, sep="\t")
 
 #Check if there are control genes for each target gene
-result.cont$matching.target = factor(result.cont$matching_target); matching.target.genes = levels(result.cont$matching_target)
+result.cont$matching_target = factor(result.cont$matching_target); matching.target.genes = levels(result.cont$matching_target)
 dim(result.target)[1]; length(matching.target.genes) #these should be the same
 setdiff(matching.target.genes, as.character(result.target$gene_id)) 
 
 #Check if each target gene has at least 3 control genes
 table(result.cont$matching_target) 
+
+#Dmel has the following problematic genes. I've manually fixed them in Dmels_Nov_2017_MK_results_analyzed_final.txt:
+#"FBgn0020376" "FBgn0022131" "FBgn0027594" "FBgn0028741" "FBgn0030926" "FBgn0035975, FBgn0020376, FBgn0016917, FBgn0029943, FBgn0030926, FBgn0033402
 
 #Dsim has the following problematic genes. I've manually fixed them in Dsims_Nov_2017_MK_results_analyzed_final.txt:
 #"FBgn0011274" "FBgn0020377" "FBgn0022131" "FBgn0028741" "FBgn0030926" "FBgn0043577", #"FBgn0027594", "FBgn0029943", "FBgn0030926", "FBgn0035975"
@@ -200,18 +204,26 @@ table(result.cont$matching_target)
 #Francoise Vermelyan's suggestion:
 #Calculate median(control) - target for a given target gene and perform a 1-sample t-test to see if the MEAN of these numbers is significantly different from 0
 
+library(plyr)
+
 #Input
-result.total.r1 = result.total #thetwW, TajD, nFWH, EW, #save it as a separate dataset
-#result.total.r1 = read.table(paste("/Users/JooHyun/Dropbox/Cornell/Lab/Projects/PopGen/final_data/",indicator,"s_Nov_2017_MK_results_analyzed_final.txt", sep=""), header=T, sep='\t') ##DoS
+#thetwW, TajD, nFWH, EW, #save it as a separate dataset
+result.total.r1 = result.total 
+colnames(result.total.r1)[14] = c("target_control_status"); colnames(result.total.r1)[17] = c("matching_target")
+
+#DoS
+result.total.r1 = read.table(paste("/Users/JooHyun/Dropbox/Cornell/Lab/Projects/PopGen/final_data/",indicator,"s_Nov_2017_MK_results_analyzed_final.txt", sep=""), header=T, sep='\t') 
+colnames(result.total.r1)[9] = c("target_control_status"); colnames(result.total.r1)[17] = c("matching_target")
 
 #Put together autophagy and phagocytosis genes
 result.total.r1$type = revalue(result.total.r1$type, c("Autophagy" = "Internalization", "Phagocytosis" = "Internalization", "Both" = "Internalization")) #change [category] into 'Internalization'
 result.total.r1$type = factor(result.total.r1$type, levels=unique(result.total.r1$type))
 
+
 one_sample_t_test = function(bio_pathway, test_choice){
     cat("Perform a 1-sample t-test for the ", test_choice, " statistic in ", bio_pathway, " genes.", "\n")
     
-    list.of.target.genes = levels(result.total.r1$matching.target) #list of case genes that have control genes (we got the names from matching case column)
+    list.of.target.genes = levels(result.total.r1$matching_target) #list of case genes that have control genes (we got the names from matching case column)
     diff.table = data.frame()
     matching_target_number =17
     
@@ -294,6 +306,7 @@ one_sample_t_test("Recognition", "DoS")
 
 
 
+
 ########################################################################################################
 #C. Create comprehensive data file for recent selection
 ########################################################################################################
@@ -307,6 +320,7 @@ indicator = "Dsim"
 
 result.total = read.table(paste("final_data/", indicator, "_DHEW_extracted_compiled_Nov_2017_cleaned_with_function.txt", sep=""), header=T, sep='\t')
 colnames(result.total)[14] = c("target_control_status") #unify the colname
+colnames(result.total.r1)[17] = c("matching_target")
 
 
 #1) Calculate the adjusted p-values 
