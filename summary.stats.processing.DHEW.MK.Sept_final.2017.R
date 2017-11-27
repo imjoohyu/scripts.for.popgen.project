@@ -193,123 +193,16 @@ table(result.cont$matching_target)
 
 
 
-
-#Result I: Comparison of statistics betweeen Internalization, Recognition, and Signaling
-#Lynn Johnson's suggestion?:
-#For each functional group (autophagy/phagocytosis, humoral), calculate the values of target-median(control), compute MEAN of these values and create a confidence interval. If the CI contains 0, on average  the targets and controls are not statistically significantly different.
-
-library(plyr)
-
-#Input
-# result.total.r1 = result.total #thetwW, TajD, nFWH, EW, or DoS #save it as a separate dataset 
-# 
-# #Put together autophagy and phagocytosis genes
-# result.total.r1$type = revalue(result.total.r1$type, c("Autophagy" = "Internalization", "Phagocytosis" = "Internalization", "Both" = "Internalization")) #change [category] into 'Internalization'
-# result.total.r1$type = factor(result.total.r1$type, levels=unique(result.total.r1$type))
-
-#Lynn Johnson's suggestion -> She later endorsed the method below.
-# library(boot)
-# create_confidence_interval = function(bio_pathway, test_choice, num_of_rep){
-#     cat("Create a CI for the ", test_choice, " statistic in ", bio_pathway, " genes.", "\n")
-#     
-#     list.of.target.genes = levels(result.total.r1$matching.target) #list of case genes that have control genes (we got the names from matching case column)
-#     diff.table = data.frame()
-#     matching_target_number =17
-#     
-#     if(test_choice == "TajD"){
-#         test_number = 5 #TajD
-#     }
-#     else if (test_choice == "nFWH"){
-#         test_number = 7
-#     }
-#     else if (test_choice == "thetaW"){
-#         test_number = 4 
-#     }
-#     else if (test_choice == "EW"){
-#         test_number = 9 
-#     }
-#     else if (test_choice == "DoS"){
-#         test_number = 14
-#         list.of.target.genes = levels(result.total.r1$matching_target)
-#         matching_target_number =12
-#     }
-#     
-#     for (n in 1:length(list.of.target.genes)){
-#         pattern = list.of.target.genes[n]
-#         data.for.pattern.target = result.total.r1[grep(pattern, result.total.r1[,1]),]
-#         data.for.pattern.target.test = data.for.pattern.target[,test_number]
-#         data.for.pattern.target.name = data.for.pattern.target$gene_name
-#         data.for.pattern.cont = result.total.r1[grep(pattern, result.total.r1[,matching_target_number]),] #picking the matching target
-#         data.for.pattern.cont.test.median = median(data.for.pattern.cont[,test_number], na.rm = T)
-#         type = data.for.pattern.cont$type[1]; subtype = data.for.pattern.cont$subtype[1]
-#         diff.median = (data.for.pattern.target.test - data.for.pattern.cont.test.median) # difference between target
-#         diff.table[n,1] = pattern; diff.table[n,2] = data.for.pattern.target.name; diff.table[n,3] = diff.median; diff.table[n,4] = type; diff.table[n,5] = subtype
-#     } #case minus control
-#     colnames(diff.table) = c("target.id", "target.name", "diff.median", "type", "subtype") #89 target genes
-#     diff.table.sorted = diff.table[order(diff.table$diff.median, decreasing=T),]
-#     diff.table.function = diff.table.sorted[which(diff.table.sorted$type == bio_pathway),]
-#     cat("Mean: ", mean(diff.table.function$diff.median, na.rm = T), "\n")
-#     cat("Number of genes: ", dim(diff.table.function)[1], "\n")
-#     
-#     #Create a confidence interval
-#     #Check the normality assumption
-#     cat("P-value for checking the normality assumption (Shapiro): ", shapiro.test(c(diff.table.function$diff.median))$p.value, "\n")
-#     if (shapiro.test(c(diff.table.function$diff.median))$p.value < 0.05){
-#         cat("Normality: not normally distributed", "\n") #If <0.05, NOT NORMALLY DISTRIBUTED
-#     }
-#     else {
-#         cat("Normality: normally distributed", "\n")
-#     }
-#     
-#     #Results: Can't use a CI if the data is normally distributed (#http://www.cyclismo.org/tutorial/R/confidence.html)
-#     
-#     #Utilize a Bootstrap method in order to calculate a Bootstrap confidence interval
-#     #Re-sample with replacement B times, for each of these samples calculate the sample mean, and calculate CI.
-#     #http://stats.stackexchange.com/questions/112829/how-do-i-calculate-confidence-intervals-for-a-non-normal-distribution
-#     
-#     #Below is a way to construct a Bootstrap CI, but I have a sample size of <50 (which is not recommended according to Kevin from CSCU)
-#     #function to obtain the mean
-#     Bmean = function (data, indices) {
-#         d = data[indices]; return(mean(d))
-#     } #goes with library(boot)
-#     
-#     #bootstrapping with X (given) replications
-#     median_list = na.omit(diff.table.function$diff.median)
-#     results = boot(data=c(median_list), statistic = Bmean, R=num_of_rep)
-#     plot(results)
-#     return(boot.ci(results, type = c("basic"))) #The intervals calculated using the basic bootstrap method.
-#     #return(boot.ci(results, type = c("norm", "basic", "perc", "bca")))
-#     #Results: all four CIs for autophagy contain 0, indicating that on average the targets and controls aren't statistically significantly different.    
-#     
-# } #target - control
-# 
-# #Internalization
-# create_confidence_interval("Internalization", "thetaW", 1000)
-# create_confidence_interval("Internalization", "TajD",1000)
-# create_confidence_interval("Internalization", "nFWH", 1000)
-# create_confidence_interval("Internalization", "EW", 1000)
-# create_confidence_interval("Internalization", "DoS", 1000)
-# 
-# #Signaling
-# create_confidence_interval("Signaling", "thetaW", 1000)
-# create_confidence_interval("Signaling", "TajD", 1000)
-# create_confidence_interval("Signaling", "nFWH", 1000)
-# create_confidence_interval("Signaling", "EW", 1000)
-# create_confidence_interval("Signaling", "DoS", 1000)
-# 
-# #Recognition
-# create_confidence_interval("Recognition", "thetaW", 1000)
-# create_confidence_interval("Recognition", "TajD", 1000)
-# create_confidence_interval("Recognition", "nFWH", 1000)
-# create_confidence_interval("Recognition", "EW", 1000)
-# create_confidence_interval("Recognition", "DoS", 1000)
+########################################################################################################
+#B. Comparison of statistics between Internalization, Recognition, and Signaling
+########################################################################################################
 
 #Francoise Vermelyan's suggestion:
 #Calculate median(control) - target for a given target gene and perform a 1-sample t-test to see if the MEAN of these numbers is significantly different from 0
+
 #Input
 result.total.r1 = result.total #thetwW, TajD, nFWH, EW, #save it as a separate dataset
 #result.total.r1 = read.table(paste("/Users/JooHyun/Dropbox/Cornell/Lab/Projects/PopGen/final_data/",indicator,"s_Nov_2017_MK_results_analyzed_final.txt", sep=""), header=T, sep='\t') ##DoS
-
 
 #Put together autophagy and phagocytosis genes
 result.total.r1$type = revalue(result.total.r1$type, c("Autophagy" = "Internalization", "Phagocytosis" = "Internalization", "Both" = "Internalization")) #change [category] into 'Internalization'
@@ -400,40 +293,11 @@ one_sample_t_test("Recognition", "EW")
 one_sample_t_test("Recognition", "DoS")
 
 
-#Result II: Comparison of statistics betweeen sub-functional groups
-#Prepare the input data
-library(plyr)
 
-#thetwW, TajD, nFWH, EW, #save it as a separate dataset
-result.total.r2 = result.total
-result.total.r2[1:103,17] = result.total.r2[1:103,1] #for Dmel
-#result.total.r2[1:96,17] = result.total.r2[1:96,1] #for Dsim
+########################################################################################################
+#C. Create comprehensive data file
+########################################################################################################
 
-#DoS
-result.total.r2 = read.table(paste("/Users/JooHyun/Dropbox/Cornell/Lab/Projects/PopGen/MK_test_Nov_2016/",indicator,"s_Jul_2017_MK_results_analyzed_final.txt", sep=""), header=T, sep='\t') ##DoS
-result.total.r2 = result.total.r2[order(result.total.r2$target_control_status, decreasing = T),]
-result.total.r2[1:100,12] = result.total.r2[1:100,1] #for Dmel
-#result.total.r2[1:93,12] = result.total.r2[1:93,1] #for Dsim
-
-result.total.r2 = result.total.r2[which(result.total.r2$type == "Autophagy" | result.total.r2$type == "Phagocytosis" | result.total.r2$type == "Both"),] #only choose internalization genes
-result.total.r2$subtype = droplevels(result.total.r2$subtype)
-
-#Group the subtypes the following way:
-#Autophagy-Induction, Autophagy-Nucleation/Expansion, Phagocytosis-Recognition, Phagocytosis-Internalization, Phagocytosis-PhagosomeMaturation/FusionWithLysosome, Both-Phago_internalization/Auto_nucleation AND Phago_internalization/Auto_expansion AND Phago_maturation/Auto_expansion, Both-Phago_maturation/Auto_fusion
-#result.total.r2$subtype = revalue(result.total.r2$subtype, c("Expansion" = "Nucleation/Expansion", "Nucleation" = "Nucleation/Expansion", "Recognition-opsonin" = "Recognition", "Recognition-receptor" = "Recognition", "Phago_internalization/Auto_nucleation" = "Both-Internalization/Expansion", "Phago_internalization/Auto_expansion" = "Both-Internalization/Expansion","Phago_maturation/Auto_expansion" =  "Both-Internalization/Expansion", "Phago_maturation/Auto_fusion" = "Both-Maturation/Fusion"  ))
-result.total.r2$subtype = revalue(result.total.r2$subtype, c("Expansion" = "Nucleation/Expansion", "Nucleation" = "Nucleation/Expansion", "Phago_internalization/Auto_nucleation" = "Both-Internalization/Expansion", "Phago_internalization/Auto_expansion" = "Both-Internalization/Expansion","Phago_maturation/Auto_expansion" =  "Both-Internalization/Expansion", "Phago_maturation/Auto_fusion" = "Both-Maturation/Fusion"  )) #Split the opsonins and receptors back
-
-
-library(lme4); library(lmerTest); library(lsmeans)
-#with interaction:
-model = lmer(thetaW ~ target.control.status + subtype + target.control.status:subtype + (1|matching.target), data=result.total.r2)
-model = lmer(TajD ~ target.control.status + subtype + target.control.status:subtype + (1|matching.target), data=result.total.r2)
-model = lmer(nFWH ~ target.control.status + subtype + target.control.status:subtype + (1|matching.target), data=result.total.r2)
-model = lmer(EW ~ target.control.status + subtype + target.control.status:subtype + (1|matching.target), data=result.total.r2)
-ls2 = lsmeans(model, pairwise~target.control.status|subtype); cld(ls2) #pairwise comparison of target vs control within subtype**********
-
-model = lmer(DoS ~ target_control_status + subtype + target_control_status:subtype + (1|matching_target), data=result.total.r2)
-ls2 = lsmeans(model, pairwise~target_control_status|subtype); cld(ls2) #pairwise comparison of target vs control within subtype**********
 
 
 #Method: Based on the p-values (only look at the internalization genes)
