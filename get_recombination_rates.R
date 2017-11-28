@@ -38,15 +38,15 @@ hist(coordinates_new_rec[which(coordinates_new_rec$chr == "X"),11], main="X", xl
 Dmel_data_ordered = Dmel_data[order(Dmel_data$gene_id),]
 coordinates_new_rec_ordered = coordinates_new_rec[order(coordinates_new_rec$gene.id), c(1,11)]
 Dmel_data_ordered_with_rec = cbind(Dmel_data_ordered, coordinates_new_rec_ordered[,2])
-Dmel_data_ordered_with_rec_focal_only = Dmel_data_ordered_with_rec[which(Dmel_data_ordered_with_rec$target.control.status == "target"),]
+Dmel_data_ordered_with_rec_focal_only = Dmel_data_ordered_with_rec[which(Dmel_data_ordered_with_rec$target_control_status == "target"),]
 
 par=(mfrow=c(1,1))
 rec_correlation = data.frame()
 for (i in 1:dim(Dmel_data_ordered_with_rec_focal_only)[1]) {
     focal_gene = as.character(Dmel_data_ordered_with_rec_focal_only[i,1])
-    focal_gene_rec = as.numeric(Dmel_data_ordered_with_rec_focal_only[i,18])
-    control_gene = Dmel_data_ordered_with_rec[grep(focal_gene, Dmel_data_ordered_with_rec$matching.target),]
-    control_gene_rec = mean(control_gene[,18])
+    focal_gene_rec = as.numeric(Dmel_data_ordered_with_rec_focal_only[i,15])
+    control_gene = Dmel_data_ordered_with_rec[grep(focal_gene, Dmel_data_ordered_with_rec$matching_target),]
+    control_gene_rec = mean(control_gene[,15])
     rec_correlation[i,1] = focal_gene_rec; rec_correlation[i,2] = control_gene_rec
 }
 plot(rec_correlation); cor(rec_correlation$V1, rec_correlation$V2) #0.8863
