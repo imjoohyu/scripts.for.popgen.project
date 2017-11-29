@@ -169,6 +169,11 @@ basic_processing = function(indicator){
 }
 result.total = basic_processing(indicator)
 
+#Remove cases where DoS is NA
+na_indicator = is.na(result.total$DoS); result.total = cbind(result.total, na_indicator)
+result.total = result.total[which(result.total$na_indicator == "FALSE"),] #only keep the cases with valid DoS values
+result.total = result.total[,-ncol(result.total)]
+
 #Check the number of genes in the data
 cat("Count the number of genes in the following species: ", indicator, "\n")
 result.target = result.total[which(result.total$target_control_status == "target"),]
@@ -177,24 +182,24 @@ cat("The number of target genes for ", indicator, " is: ", dim(result.target)[1]
 cat("The number of control genes for ", indicator, " is: ", dim(result.cont)[1], "\n")
 
 
-#Save the results
-write.table(result.total, file="Dmels_Nov_2017_MK_results_analyzed_final.txt", quote=F, col.names = T, row.names = F, sep="\t")
-#write.table(result.total, file="Dsims_Nov_2017_MK_results_analyzed_final.txt", quote=F, col.names = T, row.names = F, sep="\t")
-
 #Check if there are control genes for each target gene
 result.cont$matching_target = factor(result.cont$matching_target); matching.target.genes = levels(result.cont$matching_target)
 dim(result.target)[1]; length(matching.target.genes) #these should be the same
-setdiff(matching.target.genes, as.character(result.target$gene_id)) 
+remove_diff = setdiff(matching.target.genes, as.character(result.target$gene_id)) 
 
-#Check if each target gene has at least 3 control genes
-table(result.cont$matching_target) 
+#Check if each target gene has at least 3 control genes and pick out those that do not
+remove_less_than_three = data.frame(table(result.cont$matching_target)<3)
+remove_less_than_three = data.frame(remove_less_than_three[which(remove_less_than_three[,1] == "TRUE"),])
+remove_less_than_three = rownames(remove_less_than_three)
 
-#Dmel has the following problematic genes. I've manually fixed them in Dmels_Nov_2017_MK_results_analyzed_final.txt:
-#"FBgn0020376" "FBgn0022131" "FBgn0027594" "FBgn0028741" "FBgn0030926" "FBgn0035975, FBgn0020376, FBgn0016917, FBgn0029943, FBgn0030926, FBgn0033402
+#Remove the genes that have fewer than 3 control genes or that have no target gene
+result.total = result.total[ !grepl(paste(remove_diff,collapse="|"), result.total$matching_target),] #remove control genes
+result.total = result.total[ !grepl(paste(remove_less_than_three,collapse="|"), result.total$matching_target),] #remove control genes
+result.total = result.total[ !grepl(paste(remove_less_than_three,collapse="|"), result.total$gene_id),] #remove target genes
 
-#Dsim has the following problematic genes. I've manually fixed them in Dsims_Nov_2017_MK_results_analyzed_final.txt:
-#"FBgn0011274" "FBgn0020377" "FBgn0022131" "FBgn0028741" "FBgn0030926" "FBgn0043577", #"FBgn0027594", "FBgn0029943", "FBgn0030926", "FBgn0035975"
-
+#Save the results
+#write.table(result.total, file="Dmels_Nov_2017_MK_results_analyzed_final.txt", quote=F, col.names = T, row.names = F, sep="\t")
+write.table(result.total, file="Dsims_Nov_2017_MK_results_analyzed_final.txt", quote=F, col.names = T, row.names = F, sep="\t")
 
 
 ########################################################################################################
@@ -213,7 +218,7 @@ colnames(result.total.r1)[14] = c("target_control_status"); colnames(result.tota
 
 #DoS
 result.total.r1 = read.table(paste("/Users/JooHyun/Dropbox/Cornell/Lab/Projects/PopGen/final_data/",indicator,"s_Nov_2017_MK_results_analyzed_final.txt", sep=""), header=T, sep='\t') 
-colnames(result.total.r1)[9] = c("target_control_status"); colnames(result.total.r1)[17] = c("matching_target")
+colnames(result.total.r1)[9] = c("target_control_status"); colnames(result.total.r1)[12] = c("matching_target")
 
 #Put together autophagy and phagocytosis genes
 result.total.r1$type = revalue(result.total.r1$type, c("Autophagy" = "Internalization", "Phagocytosis" = "Internalization", "Both" = "Internalization")) #change [category] into 'Internalization'
@@ -530,3 +535,158 @@ colnames(result.target.simplified)[21:26] = c("TajD_rank", "TajD_rank_against_nu
 
 write.table(result.target.simplified, file = paste("/Users/JooHyun/Dropbox/Cornell/Lab/Projects/PopGen/final_data/",indicator, "_DHEW_extracted_compiled_Nov_2017_cleaned_with_function_and_ranking.txt", sep=""), quote=F, row.names = F, col.names = T)
 
+
+########################################################################################################
+#D. Create comprehensive data file for recurrent selection
+########################################################################################################
+
+rm(list=ls(all=TRUE))
+setwd("/Users/JooHyun/Dropbox/Cornell/Lab/Projects/PopGen/")
+
+#Indicate which species we're working with:
+#indicator = "Dmel"
+indicator = "Dsim"
+
+result.total = read.table(paste("final_data/", indicator, "s_Nov_2017_MK_results_analyzed_final.txt", sep=""), header=T, sep='\t')
+colnames(result.total)[9] = c("target_control_status") #unify the colname
+colnames(result.total)[12] = c("matching_target")
+
+
+#1) Calculate the difference between median of control genes and target gene and rank them (X out of 74).
+
+result.target = result.total[which(result.total$target_control_status == "target"),]
+result.cont = result.total[which(result.total$target_control_status == "control"),]
+result.target.internalized = result.target[which(result.target$type %in% c("Autophagy", "Phagocytosis", "Both")),] #only get internalization genes
+list.of.target.genes = droplevels(result.target.internalized$gene_id)
+
+rank_the_difference = function(list.of.target.genes){
+    diff.table = data.frame()
+    for (n in 1:length(list.of.target.genes)){
+        pattern = list.of.target.genes[n]
+        data.for.pattern.target = result.total[grep(pattern, result.total[,1]),]
+        data.for.pattern.target.statistic = data.for.pattern.target$DoS
+        data.for.pattern.target.name = data.for.pattern.target$gene_name
+        data.for.pattern.cont = result.total[grep(pattern, result.total[,12]),] #matching_target
+        data.for.pattern.cont.statistic.median = median(data.for.pattern.cont$DoS)
+
+        type = data.for.pattern.cont$type[1]; subtype = data.for.pattern.cont$subtype[1]
+        diff.median = (data.for.pattern.target.statistic - data.for.pattern.cont.statistic.median) # difference between target
+        
+        diff.table[n,1] = pattern; diff.table[n,2] = data.for.pattern.target.name
+        diff.table[n,3] = data.for.pattern.target.statistic
+        diff.table[n,4] = data.for.pattern.cont.statistic.median
+        diff.table[n,5] = diff.median; diff.table[n,6] = type; diff.table[n,7] = subtype
+        
+    } #target minus control
+    
+    colnames(diff.table) = c("target_id", "target_name", "target_value", "med_cont_value", "diff_median", "type", "subtype")
+    diff.table.sorted = diff.table[order(diff.table$diff_median, decreasing=F),]
+    percentage_ranking = c(1:length(list.of.target.genes))/length(list.of.target.genes)*100
+    diff.table.sorted = cbind(diff.table.sorted, c(1:length(list.of.target.genes)), percentage_ranking)
+    colnames(diff.table.sorted)[8] = "ranking"; colnames(diff.table.sorted)[9] = "percentage_ranking"
+    
+    return(diff.table.sorted)
+}
+ranking_of_median_difference_DoS = rank_the_difference(list.of.target.genes)
+
+
+#2) Create a distribution of [gene 1 - median(rest of genes)] and see where my [target - median(control)] lands — breaks the pairing/grouping of focal vs control, but you can actually create a distribution (X out of 375)
+
+result.target.internalized = result.target[which(result.target$type %in% c("Autophagy", "Phagocytosis", "Both")),] #only get internalization genes
+list.of.target.genes = droplevels(result.target.internalized$gene_id)
+result.total.internalized = result.total[which(result.total$type %in% c("Autophagy", "Phagocytosis", "Both")),] #only get internalization genes with their controls
+
+
+#Create a null distribution
+create_a_null_distribution = function(list.of.target.genes){
+    data.for.dist = result.total.internalized #internalization genes only + their controls
+    data.for.dist.target.only = data.for.dist[which(data.for.dist$target_control_status == "target"),]
+    data.for.dist.cont.only = data.for.dist[which(data.for.dist$target_control_status == "control"),]
+    data.for.dist.target.only$matching_target = data.for.dist.target.only$gene_id
+    data.for.dist = rbind(data.for.dist.target.only, data.for.dist.cont.only)
+    
+    data.for.dist$matching.target = factor(data.for.dist$matching_target)
+    list.of.target.genes = levels(data.for.dist$matching_target)
+    column_number = 14
+    
+    median.table = c()
+    for (n in 1:length(list.of.target.genes)){
+        cluster = data.for.dist[which(data.for.dist$matching_target == list.of.target.genes[n]),]
+        number.of.genes.in.cluster = dim(cluster)[1]
+        for (o in 2:number.of.genes.in.cluster){ #remove the true [target - median(control)] case
+            target.data = cluster[o,column_number]; median.control.data = median(cluster[-o,column_number])
+            diff.median = (target.data - median.control.data)
+            median.table = rbind(median.table, diff.median)
+        }
+    }
+    median.table = na.omit(median.table)
+    median.table.ordered = median.table[order(median.table[,1], decreasing=T),] #target minus control
+    print(shapiro.test(as.numeric(unlist(median.table.ordered))))
+    hist(median.table.ordered, main="Null distribution of [gene 1 - median(rest of genes)]: DoS")
+    
+    return(median.table.ordered)
+}
+null_distribution_DoS = create_a_null_distribution(list.of.target.genes)
+
+#Compare the true [target - median(control)] to the null distribution
+compare_to_null = function(list.of.target.genes, null.dist){
+    data.for.dist = result.total.internalized
+    data.for.dist.target.only = data.for.dist[which(data.for.dist$target_control_status == "target"),]
+    data.for.dist.cont.only = data.for.dist[which(data.for.dist$target_control_status == "control"),]
+    data.for.dist.target.only$matching_target = data.for.dist.target.only$gene_id
+    data.for.dist = rbind(data.for.dist.target.only, data.for.dist.cont.only)
+    
+    data.for.dist$matching_target = factor(data.for.dist$matching_target)
+    list.of.target.genes = levels(data.for.dist$matching_target)
+    column_number = 14
+    
+    median.table = c()
+    for (n in 1:length(list.of.target.genes)){
+        cluster = data.for.dist[which(data.for.dist$matching_target == list.of.target.genes[n]),]
+        number.of.genes.in.cluster = dim(cluster)[1]
+        target.data = cluster[1,column_number]; median.control.data = median(cluster[-1,column_number])
+        diff.median = (target.data - median.control.data)
+        
+        #find out where the true difference stands in the null distribution
+        null.dist.with.true = c(null.dist, diff.median)
+        ranking = rank(null.dist.with.true)[length(null.dist)+1] #ranking of the true difference - the last one
+        ranking_percentage = c(ranking/length(null.dist))*100
+        gene_name = as.character(data.for.dist[which(data.for.dist$gene_id == list.of.target.genes[n]),2])
+        type = as.character(data.for.dist[which(data.for.dist$gene_id == list.of.target.genes[n]),10])
+        subtype = as.character(data.for.dist[which(data.for.dist$gene_id == list.of.target.genes[n]),11])
+        diff.median.and.rank = c(list.of.target.genes[n], gene_name, type, subtype, diff.median, ranking, ranking_percentage)
+        median.table = rbind(median.table, diff.median.and.rank)
+    }
+    
+    colnames(median.table) = c("gene_id", "gene_name", "type", "subtype", "True_median_difference", "Ranking", "percentage_ranking")
+    median.table = median.table[order(as.numeric(median.table[,7])),]
+    median.table = data.frame(median.table)
+    
+    return(median.table)
+}
+compare_to_null_DoS = compare_to_null(list.of.target.genes, null_distribution_DoS)
+
+
+#4) Complie all the results
+ranking_of_median_difference_DoS_simplified = ranking_of_median_difference_DoS[,c(1,5,8,9)]
+ranking_of_median_difference_DoS_simplified$diff_median = as.numeric(as.character(ranking_of_median_difference_DoS_simplified$diff_median))
+ranking_of_median_difference_DoS_simplified$ranking = as.numeric(as.character(ranking_of_median_difference_DoS_simplified$ranking))
+ranking_of_median_difference_DoS_simplified$percentage_ranking = as.numeric(as.character(ranking_of_median_difference_DoS_simplified$percentage_ranking))
+
+compare_to_null_DoS_simplified = compare_to_null_DoS[,c(1,6,7)]
+compare_to_null_DoS_simplified$ranking = as.numeric(as.character(compare_to_null_DoS_simplified$ranking))
+compare_to_null_DoS_simplified$percentage_ranking = as.numeric(as.character(compare_to_null_DoS_simplified$percentage_ranking))
+
+for (i in 1:dim(result.target.internalized)[1]){
+    gene_id = as.character(result.target.internalized[i,1])
+    result.target.internalized[i,15] = as.numeric(ranking_of_median_difference_DoS_simplified[which(ranking_of_median_difference_DoS_simplified$target_id == gene_id),2])
+    result.target.internalized[i,16] = as.numeric(ranking_of_median_difference_DoS_simplified[which(ranking_of_median_difference_DoS_simplified$target_id == gene_id),3])
+    result.target.internalized[i,17] = as.numeric(ranking_of_median_difference_DoS_simplified[which(ranking_of_median_difference_DoS_simplified$target_id == gene_id),4])
+    result.target.internalized[i,18] = as.numeric(compare_to_null_DoS_simplified[which(compare_to_null_DoS_simplified$gene_id == gene_id),2])
+    result.target.internalized[i,19] = as.numeric(compare_to_null_DoS_simplified[which(compare_to_null_DoS_simplified$gene_id == gene_id),3])
+}
+colnames(result.target.internalized)[15:19] = c("DoS_diff", "DoS_rank", "DoS_rank_percent", "DoS_rank_against_null_rank", "DoS_rank_against_null_rank")
+
+result.target.internalized = result.target.internalized[order(result.target.internalized$DoS, decreasing = T),]
+
+write.table(result.target.internalized, file = paste("/Users/JooHyun/Dropbox/Cornell/Lab/Projects/PopGen/final_data/",indicator, "s_Nov_2017_MK_results_analyzed_final_with_function_and_ranking.txt", sep=""), quote=F, row.names = F, col.names = T)
